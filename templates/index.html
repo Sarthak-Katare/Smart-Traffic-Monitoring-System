@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Traffic AI | 4-Lane Multi-Camera Optimization & VAHAN Verification</title>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3.0">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navigation Header -->
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-traffic-light"></i>
+                </div>
+                <div>
+                    <h1>Smart Traffic AI <span>Multi-Camera & VAHAN Controller</span></h1>
+                    <p class="subtitle">4-Lane Individual Video Feeds • Dynamic Wait Time Engine • MoRTH VAHAN Vehicle RC Verification</p>
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <a href="/" class="nav-link active" id="navHome"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+                <a href="/trajectory" class="nav-link"><i class="fa-solid fa-route"></i> Trajectory</a>
+                <a href="/analytics" class="nav-link"><i class="fa-solid fa-chart-area"></i> Analytics</a>
+                <a href="/alerts" class="nav-link" id="navAlerts"><i class="fa-solid fa-bell"></i> Alerts
+                    <span class="alert-badge" id="navAlertBadge" style="display:none;">0</span>
+                </a>
+                <a href="/history" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i> History &amp; Logs</a>
+                <button class="btn btn-outline-sm" id="btnOpenVideoManager">
+                    <i class="fa-solid fa-video"></i> Manage 4-Lane Videos
+                </button>
+                <div class="system-status-pill" id="systemStatusPill">
+                    <span class="status-dot"></span>
+                    <span id="statusText">System Initializing...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid Layout -->
+        <main class="dashboard-grid">
+            
+            <!-- Left Section: 4-Camera Video Feed with Multi-View Selector -->
+            <section class="card video-section">
+                <div class="card-header">
+                    <div class="header-left">
+                        <h2><i class="fa-solid fa-camera"></i> Live Multi-Camera Intersection Feed</h2>
+                        <span class="badge-subtitle">4 Dedicated Lane Video Streams</span>
+                    </div>
+                    <div class="camera-tabs" id="cameraViewTabs">
+                        <button class="cam-tab active" data-view="combined">
+                            <i class="fa-solid fa-table-cells-large"></i> Quad Grid (2x2)
+                        </button>
+                        <button class="cam-tab" data-view="North">
+                            <i class="fa-solid fa-arrow-up"></i> North
+                        </button>
+                        <button class="cam-tab" data-view="East">
+                            <i class="fa-solid fa-arrow-right"></i> East
+                        </button>
+                        <button class="cam-tab" data-view="South">
+                            <i class="fa-solid fa-arrow-down"></i> South
+                        </button>
+                        <button class="cam-tab" data-view="West">
+                            <i class="fa-solid fa-arrow-left"></i> West
+                        </button>
+                    </div>
+                    <div class="feed-badge" id="feedBadge">
+                        <i class="fa-solid fa-circle"></i> Cameras Live
+                    </div>
+                </div>
+
+                <div class="video-container" id="videoContainer">
+                    <!-- Placeholder: Shown if stream stops -->
+                    <div class="video-placeholder" id="videoPlaceholder" style="display:none;">
+                        <i class="fa-solid fa-camera-rotate placeholder-icon"></i>
+                        <h3>4-Camera Video Engine Suspended</h3>
+                        <p id="videoStatusMessage">Click <strong>Start AI Stream</strong> to activate all 4 lane video feeds</p>
+                    </div>
+
+                    <!-- Error Notice -->
+                    <div class="video-error" id="videoError" style="display:none;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <p id="videoErrorMessage">Video source error.</p>
+                    </div>
+
+                    <!-- Live MJPEG Stream -->
+                    <img
+                        id="videoStreamImg"
+                        src="/video_feed/combined"
+                        alt="Live 4-Lane Camera Feed"
+                        class="stream-image"
+                    />
+
+                    <!-- Active View Watermark -->
+                    <div class="view-indicator" id="viewIndicator">
+                        <i class="fa-solid fa-video"></i> <span id="currentViewLabel">QUAD-VIEW (North, East, South, West)</span>
+                    </div>
+                </div>
+
+                <!-- Stream & Source Controls -->
+                <div class="video-controls">
+                    <div class="controls-left">
+                        <button class="btn btn-danger" id="btnToggleProcess">
+                            <i class="fa-solid fa-square"></i> Stop Stream
+                        </button>
+                        <button class="btn btn-secondary" id="btnRestartStreams">
+                            <i class="fa-solid fa-rotate"></i> Reset Feeds
+                        </button>
+                    </div>
+                    <div class="controls-right">
+                        <span class="fps-pill"><i class="fa-solid fa-bolt"></i> YOLOv8n Active</span>
+                        <span class="active-cams-pill"><i class="fa-solid fa-video"></i> 4 Feeds Synchronized</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Section: 4-Way Traffic Signal & Dynamic Wait Time Controller -->
+            <section class="card signal-section">
+                <div class="card-header">
+                    <div class="header-left">
+                        <h2><i class="fa-solid fa-microchip"></i> Smart Signal & Wait Time Controller</h2>
+                        <span class="badge-subtitle">Adaptive Density Priority</span>
+                    </div>
+                    <div class="pulse-indicator">DYNAMIC TIMING ACTIVE</div>
+                </div>
+                
+                <!-- Active Green Banner -->
+                <div class="active-signal-banner">
+                    <div class="banner-details">
+                        <span class="active-tag">CURRENT GREEN PHASE</span>
+                        <div class="active-lane-label"><span id="currentGreenLane">NORTH</span> LANE</div>
+                    </div>
+                    <div class="timer-display">
+                        <div class="timer-number-box">
+                            <span id="timerCountdown">15</span>
+                            <span class="unit">sec</span>
+                        </div>
+                        <small id="activePhaseStatus">Green Light Remaining</small>
+                    </div>
+                </div>
+
+                <!-- 4 Signals Cards Grid with Dynamic Wait Time for Each Lane -->
+                <div class="signals-grid">
+                    
+                    <!-- North Lane Signal Card -->
+                    <div class="signal-card active-green" id="signalCard-North">
+                        <div class="signal-card-header">
+                            <div class="lane-title">
+                                <span class="dir-icon"><i class="fa-solid fa-arrow-up"></i></span>
+                                <div>
+                                    <h4>NORTH LANE</h4>
+                                    <small id="sourceLabel-North">lane_north.mp4</small>
+                                </div>
+                            </div>
+                            <span class="status-badge" id="signalBadge-North">ACTIVE GREEN</span>
+                        </div>
+                        
+                        <div class="signal-body">
+                            <!-- Physical 3-Bulb Traffic Light -->
+                            <div class="traffic-light">
+                                <div class="light red"></div>
+                                <div class="light yellow"></div>
+                                <div class="light green active"></div>
+                            </div>
+
+                            <!-- Real-Time Metrics & Dynamic Wait Time Display -->
+                            <div class="signal-metrics">
+                                <div class="wait-time-box" id="waitBox-North">
+                                    <span class="wait-label">Current Wait Time:</span>
+                                    <span class="wait-value active" id="waitVal-North">0s (Discharging)</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Vehicles in Lane:</span>
+                                    <strong id="sigCount-North">0</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>PCU Density:</span>
+                                    <strong id="sigPcu-North">0.0 PCU</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Allocated Green:</span>
+                                    <strong class="green-alloc" id="sigGreen-North">15s</strong>
+                                </div>
+                                <div class="queue-status-tag" id="queueTag-North">
+                                    <i class="fa-solid fa-circle-check" style="color:#34c759"></i> Actively Flowing
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- East Lane Signal Card -->
+                    <div class="signal-card" id="signalCard-East">
+                        <div class="signal-card-header">
+                            <div class="lane-title">
+                                <span class="dir-icon"><i class="fa-solid fa-arrow-right"></i></span>
+                                <div>
+                                    <h4>EAST LANE</h4>
+                                    <small id="sourceLabel-East">lane_east.mp4</small>
+                                </div>
+                            </div>
+                            <span class="status-badge red" id="signalBadge-East">WAITING (RED)</span>
+                        </div>
+                        
+                        <div class="signal-body">
+                            <div class="traffic-light">
+                                <div class="light red active"></div>
+                                <div class="light yellow"></div>
+                                <div class="light green"></div>
+                            </div>
+
+                            <div class="signal-metrics">
+                                <div class="wait-time-box" id="waitBox-East">
+                                    <span class="wait-label">Dynamic Wait Time:</span>
+                                    <span class="wait-value" id="waitVal-East">18s</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Vehicles in Lane:</span>
+                                    <strong id="sigCount-East">0</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>PCU Density:</span>
+                                    <strong id="sigPcu-East">0.0 PCU</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Allocated Green:</span>
+                                    <strong class="green-alloc" id="sigGreen-East">15s</strong>
+                                </div>
+                                <div class="queue-status-tag" id="queueTag-East">
+                                    <i class="fa-solid fa-hourglass-half"></i> Queue #1 (Next in line)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- South Lane Signal Card -->
+                    <div class="signal-card" id="signalCard-South">
+                        <div class="signal-card-header">
+                            <div class="lane-title">
+                                <span class="dir-icon"><i class="fa-solid fa-arrow-down"></i></span>
+                                <div>
+                                    <h4>SOUTH LANE</h4>
+                                    <small id="sourceLabel-South">lane_south.mp4</small>
+                                </div>
+                            </div>
+                            <span class="status-badge red" id="signalBadge-South">WAITING (RED)</span>
+                        </div>
+                        
+                        <div class="signal-body">
+                            <div class="traffic-light">
+                                <div class="light red active"></div>
+                                <div class="light yellow"></div>
+                                <div class="light green"></div>
+                            </div>
+
+                            <div class="signal-metrics">
+                                <div class="wait-time-box" id="waitBox-South">
+                                    <span class="wait-label">Dynamic Wait Time:</span>
+                                    <span class="wait-value" id="waitVal-South">36s</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Vehicles in Lane:</span>
+                                    <strong id="sigCount-South">0</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>PCU Density:</span>
+                                    <strong id="sigPcu-South">0.0 PCU</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Allocated Green:</span>
+                                    <strong class="green-alloc" id="sigGreen-South">15s</strong>
+                                </div>
+                                <div class="queue-status-tag" id="queueTag-South">
+                                    <i class="fa-solid fa-clock"></i> Queue #2
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- West Lane Signal Card -->
+                    <div class="signal-card" id="signalCard-West">
+                        <div class="signal-card-header">
+                            <div class="lane-title">
+                                <span class="dir-icon"><i class="fa-solid fa-arrow-left"></i></span>
+                                <div>
+                                    <h4>WEST LANE</h4>
+                                    <small id="sourceLabel-West">lane_west.mp4</small>
+                                </div>
+                            </div>
+                            <span class="status-badge red" id="signalBadge-West">WAITING (RED)</span>
+                        </div>
+                        
+                        <div class="signal-body">
+                            <div class="traffic-light">
+                                <div class="light red active"></div>
+                                <div class="light yellow"></div>
+                                <div class="light green"></div>
+                            </div>
+
+                            <div class="signal-metrics">
+                                <div class="wait-time-box" id="waitBox-West">
+                                    <span class="wait-label">Dynamic Wait Time:</span>
+                                    <span class="wait-value" id="waitVal-West">54s</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Vehicles in Lane:</span>
+                                    <strong id="sigCount-West">0</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>PCU Density:</span>
+                                    <strong id="sigPcu-West">0.0 PCU</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Allocated Green:</span>
+                                    <strong class="green-alloc" id="sigGreen-West">15s</strong>
+                                </div>
+                                <div class="queue-status-tag" id="queueTag-West">
+                                    <i class="fa-solid fa-clock"></i> Queue #3
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Emergency Override Controls -->
+                <div class="emergency-override-box">
+                    <div class="override-title">
+                        <i class="fa-solid fa-shield-halved"></i> <span>Emergency Priority Preemption</span>
+                    </div>
+                    <div class="override-controls">
+                        <select id="overrideLaneSelect" class="custom-select-sm">
+                            <option value="North">North Lane</option>
+                            <option value="East">East Lane</option>
+                            <option value="South">South Lane</option>
+                            <option value="West">West Lane</option>
+                        </select>
+                        <button class="btn btn-warning-sm" id="btnForceGreen">
+                            <i class="fa-solid fa-bolt"></i> Force Green (30s)
+                        </button>
+                        <button class="btn btn-outline-sm" id="btnReleaseOverride" style="display:none;">
+                            <i class="fa-solid fa-unlock"></i> Release Override
+                        </button>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Vehicle Summary Counters Across All 4 Feeds -->
+            <section class="stats-overview">
+                <div class="stat-card total-card">
+                    <div class="stat-icon"><i class="fa-solid fa-car-rear"></i></div>
+                    <div class="stat-data">
+                        <span class="stat-number" id="statTotalVehicles">0</span>
+                        <span class="stat-label">Total Active Vehicles (4 Lanes)</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon car"><i class="fa-solid fa-car"></i></div>
+                    <div class="stat-data">
+                        <span class="stat-number" id="statCars">0</span>
+                        <span class="stat-label">Cars (1.0 PCU)</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon bike"><i class="fa-solid fa-motorcycle"></i></div>
+                    <div class="stat-data">
+                        <span class="stat-number" id="statBikes">0</span>
+                        <span class="stat-label">Motorcycles (0.5 PCU)</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon bus"><i class="fa-solid fa-bus"></i></div>
+                    <div class="stat-data">
+                        <span class="stat-number" id="statBuses">0</span>
+                        <span class="stat-label">Buses (2.5 PCU)</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon truck"><i class="fa-solid fa-truck"></i></div>
+                    <div class="stat-data">
+                        <span class="stat-number" id="statTrucks">0</span>
+                        <span class="stat-label">Trucks (3.0 PCU)</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4-Lane Dedicated Video Management & Density Breakdown Cards -->
+            <section class="card lane-breakdown-section">
+                <div class="card-header">
+                    <div class="header-left">
+                        <h2><i class="fa-solid fa-road"></i> 4 Lane Individual Video Inputs & Real-Time Density</h2>
+                        <span class="badge-subtitle">Manage individual video sources and view live queue metrics</span>
+                    </div>
+                </div>
+                <div class="lane-cards-container">
+                    
+                    <!-- Lane North Card -->
+                    <div class="lane-box" id="laneBox-North">
+                        <div class="lane-box-top">
+                            <div class="lane-name-group">
+                                <h3><i class="fa-solid fa-arrow-up"></i> North Lane Camera</h3>
+                                <span class="source-tag" id="boxSource-North">lane_north.mp4</span>
+                            </div>
+                            <span class="density-badge low" id="density-North">LOW</span>
+                        </div>
+                        <div class="lane-box-body">
+                            <div class="metric-big"><span id="count-North">0</span> <small>vehicles</small></div>
+                            <div class="metric-sub">PCU Score: <strong id="pcu-North">0.0</strong></div>
+                            <div class="metric-sub">Wait Time: <strong id="boxWait-North" class="text-cyan">0s</strong></div>
+                            <div class="metric-sub">Allocated Green: <strong id="recGreen-North">15s</strong></div>
+                        </div>
+                        <div class="lane-box-footer">
+                            <label class="upload-btn-label">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Video
+                                <input type="file" class="lane-file-input" data-lane="North" accept="video/*" style="display:none;">
+                            </label>
+                            <button class="btn-icon view-cam-btn" data-lane="North" title="View North Camera Only">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lane East Card -->
+                    <div class="lane-box" id="laneBox-East">
+                        <div class="lane-box-top">
+                            <div class="lane-name-group">
+                                <h3><i class="fa-solid fa-arrow-right"></i> East Lane Camera</h3>
+                                <span class="source-tag" id="boxSource-East">lane_east.mp4</span>
+                            </div>
+                            <span class="density-badge low" id="density-East">LOW</span>
+                        </div>
+                        <div class="lane-box-body">
+                            <div class="metric-big"><span id="count-East">0</span> <small>vehicles</small></div>
+                            <div class="metric-sub">PCU Score: <strong id="pcu-East">0.0</strong></div>
+                            <div class="metric-sub">Wait Time: <strong id="boxWait-East" class="text-amber">18s</strong></div>
+                            <div class="metric-sub">Allocated Green: <strong id="recGreen-East">15s</strong></div>
+                        </div>
+                        <div class="lane-box-footer">
+                            <label class="upload-btn-label">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Video
+                                <input type="file" class="lane-file-input" data-lane="East" accept="video/*" style="display:none;">
+                            </label>
+                            <button class="btn-icon view-cam-btn" data-lane="East" title="View East Camera Only">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lane South Card -->
+                    <div class="lane-box" id="laneBox-South">
+                        <div class="lane-box-top">
+                            <div class="lane-name-group">
+                                <h3><i class="fa-solid fa-arrow-down"></i> South Lane Camera</h3>
+                                <span class="source-tag" id="boxSource-South">lane_south.mp4</span>
+                            </div>
+                            <span class="density-badge low" id="density-South">LOW</span>
+                        </div>
+                        <div class="lane-box-body">
+                            <div class="metric-big"><span id="count-South">0</span> <small>vehicles</small></div>
+                            <div class="metric-sub">PCU Score: <strong id="pcu-South">0.0</strong></div>
+                            <div class="metric-sub">Wait Time: <strong id="boxWait-South" class="text-amber">36s</strong></div>
+                            <div class="metric-sub">Allocated Green: <strong id="recGreen-South">15s</strong></div>
+                        </div>
+                        <div class="lane-box-footer">
+                            <label class="upload-btn-label">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Video
+                                <input type="file" class="lane-file-input" data-lane="South" accept="video/*" style="display:none;">
+                            </label>
+                            <button class="btn-icon view-cam-btn" data-lane="South" title="View South Camera Only">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lane West Card -->
+                    <div class="lane-box" id="laneBox-West">
+                        <div class="lane-box-top">
+                            <div class="lane-name-group">
+                                <h3><i class="fa-solid fa-arrow-left"></i> West Lane Camera</h3>
+                                <span class="source-tag" id="boxSource-West">lane_west.mp4</span>
+                            </div>
+                            <span class="density-badge low" id="density-West">LOW</span>
+                        </div>
+                        <div class="lane-box-body">
+                            <div class="metric-big"><span id="count-West">0</span> <small>vehicles</small></div>
+                            <div class="metric-sub">PCU Score: <strong id="pcu-West">0.0</strong></div>
+                            <div class="metric-sub">Wait Time: <strong id="boxWait-West" class="text-amber">54s</strong></div>
+                            <div class="metric-sub">Allocated Green: <strong id="recGreen-West">15s</strong></div>
+                        </div>
+                        <div class="lane-box-footer">
+                            <label class="upload-btn-label">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Video
+                                <input type="file" class="lane-file-input" data-lane="West" accept="video/*" style="display:none;">
+                            </label>
+                            <button class="btn-icon view-cam-btn" data-lane="West" title="View West Camera Only">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- VAHAN Vehicle Registration Certificate (RC) & ANPR Panel        -->
+            <!-- =============================================================== -->
+            <section class="card vahan-section" id="vahanSection">
+                <div class="card-header">
+                    <div class="header-left">
+                        <h2><i class="fa-solid fa-id-card-clip"></i> VAHAN Vehicle RC Verification & ANPR</h2>
+                        <span class="badge-subtitle">MoRTH National Vehicle Registry Data Standard • Insurance, PUC & E-Challan</span>
+                    </div>
+                    <div class="vahan-official-badge">
+                        <i class="fa-solid fa-building-columns"></i> MoRTH / VAHAN Engine
+                    </div>
+                </div>
+
+                <div class="vahan-search-bar-container">
+                    <div class="vahan-input-wrap">
+                        <div class="ind-plate-prefix">
+                            <span class="ind-circle"></span>
+                            <span>IND</span>
+                        </div>
+                        <input
+                            type="text"
+                            id="vahanPlateInput"
+                            class="vahan-plate-input"
+                            placeholder="Enter Plate (e.g. DL 01 AB 1234, MH 12 DE 1433)"
+                            maxlength="15"
+                            autocomplete="off"
+                        />
+                        <button class="btn btn-primary" id="btnVerifyPlate">
+                            <i class="fa-solid fa-magnifying-glass"></i> Verify RC
+                        </button>
+                        <button class="btn btn-secondary" id="btnAnprScan">
+                            <i class="fa-solid fa-camera"></i> Scan Camera ANPR
+                        </button>
+                    </div>
+
+                    <!-- Quick Sample Plate Buttons -->
+                    <div class="quick-plates">
+                        <span class="quick-label">Sample Test Plates:</span>
+                        <button class="plate-pill" data-plate="DL01AB1234">DL 01 AB 1234 (Diesel SUV)</button>
+                        <button class="plate-pill" data-plate="MH12DE1433">MH 12 DE 1433 (EV Car)</button>
+                        <button class="plate-pill" data-plate="KA05MJ9988">KA 05 MJ 9988 (Motorcycle)</button>
+                        <button class="plate-pill" data-plate="HR26DQ5501">HR 26 DQ 5501 (Commercial Truck)</button>
+                    </div>
+                </div>
+
+                <!-- VAHAN Vehicle Result Card (Dynamically updated) -->
+                <div class="vahan-result-container" id="vahanResultContainer">
+                    <div class="vahan-card" id="vahanCard">
+                        
+                        <!-- Top Ribbon: Plate Badge & Model Header -->
+                        <div class="vahan-card-header">
+                            <div class="hsrp-plate-graphic">
+                                <div class="hsrp-blue-strip">
+                                    <span class="ashok-chakra">☸</span>
+                                    <span class="ind-text">IND</span>
+                                </div>
+                                <div class="hsrp-number" id="vahanCardPlate">DL 01 AB 1234</div>
+                            </div>
+                            <div class="vahan-header-info">
+                                <h3 id="vahanCardModel">Hyundai Creta SX (O) 1.5L CRDi Diesel</h3>
+                                <div class="vahan-tags">
+                                    <span class="vahan-tag blue" id="vahanCardClass">Motor Car (LMV)</span>
+                                    <span class="vahan-tag emerald" id="vahanCardFuel">DIESEL (BS-VI)</span>
+                                    <span class="vahan-tag purple" id="vahanCardRto">DL-01 Mall Road RTO</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3-Column Specifications Grid -->
+                        <div class="vahan-grid">
+                            
+                            <!-- Column 1: Ownership & Registration -->
+                            <div class="vahan-subcard">
+                                <h4><i class="fa-solid fa-user-shield"></i> Registration Details</h4>
+                                <div class="vahan-detail-row">
+                                    <span>Owner Name:</span>
+                                    <strong id="vahanCardOwner">R***H S****A</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Registration Date:</span>
+                                    <strong id="vahanCardRegDate">12-Apr-2023</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Fitness Validity:</span>
+                                    <strong id="vahanCardFitness">11-Apr-2038 (15 Yrs)</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Road Tax:</span>
+                                    <strong id="vahanCardTax">L.T.T (Life Time)</strong>
+                                </div>
+                            </div>
+
+                            <!-- Column 2: Insurance & Emission Compliance -->
+                            <div class="vahan-subcard">
+                                <h4><i class="fa-solid fa-file-shield"></i> Compliance & Insurance</h4>
+                                <div class="vahan-detail-row">
+                                    <span>Insurance Status:</span>
+                                    <span class="status-chip active" id="vahanCardInsuranceStatus">
+                                        <i class="fa-solid fa-circle-check"></i> ACTIVE
+                                    </span>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Insurer:</span>
+                                    <strong id="vahanCardInsurer">HDFC ERGO General Ins.</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>PUC (Pollution):</span>
+                                    <span class="status-chip active" id="vahanCardPucStatus">
+                                        <i class="fa-solid fa-leaf"></i> VALID (Oct 2026)
+                                    </span>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Emission Norms:</span>
+                                    <strong id="vahanCardEmission">BHARAT STAGE VI</strong>
+                                </div>
+                            </div>
+
+                            <!-- Column 3: E-Challan & Blacklist Check -->
+                            <div class="vahan-subcard">
+                                <h4><i class="fa-solid fa-gavel"></i> Traffic Violations & Challan</h4>
+                                <div class="vahan-detail-row">
+                                    <span>Pending Challans:</span>
+                                    <strong class="text-emerald" id="vahanCardChallanStatus">0 Pending (₹0)</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Blacklist Status:</span>
+                                    <strong class="text-emerald" id="vahanCardBlacklist">NO (Clean)</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>ANPR Match Confidence:</span>
+                                    <strong class="text-cyan" id="vahanCardAnprConf">98.4%</strong>
+                                </div>
+                                <div class="vahan-challan-box" id="vahanChallanBox">
+                                    <small id="vahanChallanSummary">No unpaid traffic violation records found for this vehicle.</small>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Footer: Official Parivahan Deep-Link Button -->
+                        <div class="vahan-card-footer">
+                            <div class="vahan-verified-meta">
+                                <i class="fa-solid fa-shield-check" style="color:var(--signal-green)"></i>
+                                <span>Verified via VAHAN National Registry • <span id="vahanVerifyTime">Just now</span></span>
+                            </div>
+                            <div class="vahan-footer-actions">
+                                <a
+                                    href="https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/searchstatus.xhtml"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="btn btn-outline-sm btn-parivahan-official"
+                                    id="btnOfficialParivahanLink"
+                                >
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Verify on Official Parivahan Citizen Portal
+                                </a>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Real-Time Analytics Charts -->
+            <section class="card chart-section">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-chart-line"></i> Real-Time Multi-Lane Analytics</h2>
+                </div>
+                <div class="charts-wrapper">
+                    <div class="chart-container">
+                        <canvas id="vehicleDistributionChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="laneWaitTimeChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             VAHAN Vehicle RC Verification & Live ANPR Detection Log
+             ═══════════════════════════════════════════════════════════ -->
+        <main class="dashboard-grid" style="margin-top:0;">
+
+            <!-- VAHAN RC Verification Section -->
+            <section class="card vahan-section">
+                <div class="card-header">
+                    <div class="header-left">
+                        <div class="card-icon" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);">
+                            <i class="fa-solid fa-id-card"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">VAHAN Vehicle RC Verification</h2>
+                            <p class="card-subtitle">MoRTH National Registry · Insurance · PUC · E-Challan</p>
+                        </div>
+                    </div>
+                    <span class="vahan-official-badge"><i class="fa-solid fa-shield-halved"></i> MoRTH OFFICIAL</span>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="vahan-search-bar-container">
+                    <div class="vahan-input-wrap">
+                        <div class="ind-plate-prefix">
+                            <div class="ind-circle"></div>
+                            <span>IND</span>
+                        </div>
+                        <input type="text" id="vahanPlateInput" class="vahan-plate-input"
+                               placeholder="Enter plate: MH12DE1433" maxlength="12" autocomplete="off">
+                        <button class="btn btn-primary" id="btnVerifyPlate">
+                            <i class="fa-solid fa-magnifying-glass"></i> Verify RC
+                        </button>
+                        <button class="btn btn-outline-sm" id="btnAnprScan">
+                            <i class="fa-solid fa-camera"></i> Scan Camera ANPR
+                        </button>
+                    </div>
+                    <div class="quick-plates">
+                        <span class="quick-label">Quick test:</span>
+                        <button class="plate-pill" data-plate="DL01AB1234">DL 01 AB 1234 (Hyundai)</button>
+                        <button class="plate-pill" data-plate="MH12DE1433">MH 12 DE 1433 (Tata EV)</button>
+                        <button class="plate-pill" data-plate="KA05MJ9988">KA 05 MJ 9988 (Maruti)</button>
+                        <button class="plate-pill" data-plate="UP16CD7712">UP 16 CD 7712 (Auto-gen)</button>
+                    </div>
+                </div>
+
+                <!-- Result Card (populated by JS) -->
+                <div class="vahan-result-container" id="vahanResultContainer">
+                    <div style="text-align:center;padding:2rem 0;color:var(--text-muted);font-size:0.85rem;">
+                        <i class="fa-solid fa-car" style="font-size:2rem;margin-bottom:0.5rem;display:block;opacity:0.3;"></i>
+                        Enter a registration number above or click <strong>Scan Camera ANPR</strong> to detect a plate from the live feed.
+                    </div>
+
+                    <!-- Pre-rendered card (hidden, cloned by JS on verify) -->
+                    <div class="vahan-card" id="vahanDataCard" style="display:none;">
+                        <!-- Header: HSRP plate graphic + model info + tags -->
+                        <div class="vahan-card-header">
+                            <div class="hsrp-plate-graphic">
+                                <div class="hsrp-blue-strip">
+                                    <span class="ashok-chakra">☸</span>
+                                    <span class="ind-text">IND</span>
+                                </div>
+                                <div class="hsrp-number" id="vahanCardPlate">DL 01 AB 1234</div>
+                            </div>
+                            <div class="vahan-header-info">
+                                <h3 id="vahanCardModel">Hyundai Creta SX (O) 1.5L</h3>
+                                <div class="vahan-tags">
+                                    <span class="vahan-tag blue" id="vahanCardClass">Motor Car (LMV)</span>
+                                    <span class="vahan-tag emerald" id="vahanCardFuel">DIESEL (BS-VI)</span>
+                                    <span class="vahan-tag purple" id="vahanCardRto">DL-01 North Delhi RTO</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3-column specs grid -->
+                        <div class="vahan-grid">
+                            <!-- Col 1: Registration Details -->
+                            <div class="vahan-subcard">
+                                <h4><i class="fa-solid fa-file-lines"></i> Registration Details</h4>
+                                <div class="vahan-detail-row">
+                                    <span>Owner</span>
+                                    <strong id="vahanCardOwner">—</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Reg. Date</span>
+                                    <strong id="vahanCardRegDate">—</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Fitness Upto</span>
+                                    <strong id="vahanCardFitness">—</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Road Tax</span>
+                                    <strong id="vahanCardTax">—</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Emission</span>
+                                    <strong id="vahanCardEmission">—</strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>ANPR Conf.</span>
+                                    <strong id="vahanCardAnprConf">—</strong>
+                                </div>
+                            </div>
+
+                            <!-- Col 2: Insurance & PUC -->
+                            <div class="vahan-subcard">
+                                <h4><i class="fa-solid fa-shield-check"></i> Insurance & PUC</h4>
+                                <div class="vahan-detail-row">
+                                    <span>Insurance</span>
+                                    <strong><span class="status-chip active" id="vahanCardInsuranceStatus">—</span></strong>
+                                </div>
+                                <div class="vahan-detail-row">
+                                    <span>Insurer</span>
+                                    <strong id="vahanCardInsurer">—</strong>
+                                </div>
+                                <div class="vahan-detail-row" style="margin-top:0.5rem;">
+                                    <span>PUC / Emission</span>
+                                    <strong><span class="status-chip active" id="vahanCardPucStatus">—</span></strong>
+                                </div>
+                                <div class="vahan-detail-row" style="margin-top:0.5rem;">
+                                    <span>Blacklist</span>
+                                    <strong id="vahanCardBlacklist">—</strong>
+                                </div>
+                            </div>
+
+                            <!-- Col 3: E-Challan & Violations -->
+                            <div class="vahan-subcard">
+                                <h4><i class="fa-solid fa-triangle-exclamation"></i> E-Challan / Violations</h4>
+                                <div class="vahan-detail-row">
+                                    <span>Pending</span>
+                                    <strong id="vahanCardChallanStatus">—</strong>
+                                </div>
+                                <div class="vahan-challan-box" id="vahanChallanSummary">
+                                    No violations data loaded yet.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="vahan-card-footer">
+                            <div class="vahan-verified-meta">
+                                <i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i>
+                                <span>Verified at: <strong id="vahanVerifyTime">—</strong></span>
+                            </div>
+                            <a href="https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/searchstatus.xhtml"
+                               target="_blank" rel="noopener" class="btn btn-outline-sm btn-parivahan-official">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                Verify on Official Parivahan Portal
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Live ANPR Detection Log -->
+            <section class="card" style="grid-column: 1/-1;">
+                <div class="card-header">
+                    <div class="header-left">
+                        <div class="card-icon" style="background:rgba(16,185,129,0.15);color:var(--accent-emerald);">
+                            <i class="fa-solid fa-camera-cctv"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">Live ANPR Detection Log</h2>
+                            <p class="card-subtitle">Real-time plate detections from 4-lane camera feeds · Updated every 3s</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                        <span id="anprReadyBadge" class="status-badge red" style="font-size:0.72rem;">ANPR Loading...</span>
+                        <button class="btn btn-outline-sm" onclick="clearAnprLog()" style="font-size:0.75rem;">
+                            <i class="fa-solid fa-trash"></i> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table class="anpr-log-table" id="anprLogTable">
+                        <thead>
+                            <tr>
+                                <th>Lane</th>
+                                <th>Plate Number</th>
+                                <th>Vehicle Type</th>
+                                <th>Confidence</th>
+                                <th>Detected At</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="anprLogBody">
+                            <tr class="anpr-empty-row">
+                                <td colspan="6">
+                                    <i class="fa-solid fa-satellite-dish"></i>
+                                    Waiting for ANPR engine to detect plates from live camera feeds...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- 4-Lane Video Manager Modal -->
+    <div class="modal-backdrop" id="videoManagerModal" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-sliders"></i> Configure 4-Lane Video Sources</h3>
+                <button class="btn-close" id="btnCloseModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-intro">Assign dedicated video files to each lane. Changes take effect instantly.</p>
+                <div class="source-list" id="modalSourceList">
+                    <!-- Loaded dynamically via JS -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnModalClose">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Page Script -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3.0"></script>
+</body>
+</html>

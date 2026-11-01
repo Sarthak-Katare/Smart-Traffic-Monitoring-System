@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Records History | Smart Traffic AI</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Topbar -->
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-traffic-light"></i>
+                </div>
+                <div>
+                    <h1>Smart Traffic AI <span>Optimization</span></h1>
+                    <p class="subtitle">B.Tech 2nd Year IT Macro Project • Traffic History & Signal Decision Logs</p>
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <a href="/" class="nav-link"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+                <a href="/history" class="nav-link active"><i class="fa-solid fa-clock-rotate-left"></i> History & Logs</a>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="dashboard-grid full-width">
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-database"></i> SQLite Historical Traffic Log Database</h2>
+                    <span class="pulse-indicator">DATABASE ONLINE</span>
+                </div>
+
+                <div class="history-stats-bar">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fa-solid fa-layer-group"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-number" id="histTotalRecords">0</span>
+                            <span class="stat-label">Logged Cycles</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon car"><i class="fa-solid fa-car-side"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-number" id="histAvgVehicles">0</span>
+                            <span class="stat-label">Avg Vehicles / Min</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bus"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-number" id="histCongestedLane">NORTH</span>
+                            <span class="stat-label">Most Congested Lane</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table of Records -->
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Active Green Lane</th>
+                                <th>Total Vehicles</th>
+                                <th>Cars / Bikes / Buses / Trucks</th>
+                                <th>Traffic Density</th>
+                                <th>Allocated Green (s)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center">No historical records in SQLite database yet. Run the traffic processing loop to log cycles.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+    <!-- Page Script -->
+    <script src="{{ url_for('static', filename='js/history.js') }}"></script>
+</body>
+</html>
+

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert Management | City-Wide ANPR Intelligence</title>
+    <meta name="description" content="Real-time blacklisted vehicle alerts, blacklist management, and alert history.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .alerts-layout {
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 1.25rem;
+            height: calc(100vh - 80px);
+            overflow: hidden;
+        }
+        .alerts-layout .blacklist-col {
+            grid-column: 1;
+            grid-row: 1 / 3;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            overflow-y: auto;
+        }
+        .alerts-layout .alerts-col {
+            grid-column: 2;
+            grid-row: 1 / 3;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            overflow-y: auto;
+        }
+
+        .alert-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .alert-card.scrollable-card { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .alert-card-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .alert-card-header h3 { font-size:0.9rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; }
+        .alert-card-header h3 i { color: #818cf8; }
+        .alert-card-body { padding: 1.25rem; }
+        .alert-card-body.scrollable-body { flex: 1; overflow-y: auto; padding: 0.75rem; }
+
+        /* Summary badges */
+        .alert-summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; }
+        .summary-stat {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+        .summary-stat .val { font-size:1.8rem; font-weight:800; line-height:1; }
+        .summary-stat .lbl { font-size:0.68rem; color:var(--text-muted); margin-top:0.2rem; }
+        .summary-stat.critical .val { color:#f87171; }
+        .summary-stat.warning .val { color:#fbbf24; }
+        .summary-stat.total .val { color:#818cf8; }
+        .summary-stat.active .val { color:#34d399; }
+
+        /* Add to Blacklist form */
+        .form-group { margin-bottom:0.85rem; }
+        .form-label { font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.35rem; display:block; }
+        .form-input {
+            width:100%;
+            background:rgba(255,255,255,0.05);
+            border:1px solid var(--border);
+            border-radius:8px;
+            padding:0.55rem 0.85rem;
+            color:var(--text-primary);
+            font-size:0.82rem;
+            outline:none;
+            box-sizing:border-box;
+            transition:border-color 0.2s;
+        }
+        .form-input:focus { border-color:#818cf8; box-shadow:0 0 0 2px rgba(129,140,248,0.2); }
+        .form-input.mono { font-family:'JetBrains Mono',monospace; letter-spacing:0.05em; font-weight:600; }
+        .btn-add-bl {
+            width:100%;
+            background:linear-gradient(135deg,#ef4444,#dc2626);
+            color:#fff;
+            border:none;
+            border-radius:9px;
+            padding:0.65rem;
+            font-weight:700;
+            font-size:0.85rem;
+            cursor:pointer;
+            transition:opacity 0.2s, transform 0.1s;
+        }
+        .btn-add-bl:hover { opacity:0.88; transform:translateY(-1px); }
+
+        /* Blacklist table */
+        .bl-table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+        .bl-table th {
+            background:rgba(255,255,255,0.04);
+            padding:0.5rem 0.65rem;
+            text-align:left;
+            font-weight:600;
+            color:var(--text-muted);
+            border-bottom:1px solid var(--border);
+            white-space:nowrap;
+        }
+        .bl-table td {
+            padding:0.55rem 0.65rem;
+            border-bottom:1px solid rgba(255,255,255,0.04);
+            vertical-align:middle;
+        }
+        .bl-plate {
+            font-family:'JetBrains Mono',monospace;
+            font-weight:700;
+            font-size:0.8rem;
+            color:#f87171;
+        }
+        .bl-reason { color:var(--text-secondary); font-size:0.72rem; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .btn-remove-bl {
+            background:rgba(239,68,68,0.15);
+            color:#f87171;
+            border:1px solid rgba(239,68,68,0.25);
+            border-radius:6px;
+            padding:0.2rem 0.55rem;
+            font-size:0.68rem;
+            font-weight:600;
+            cursor:pointer;
+            transition:background 0.15s;
+            white-space:nowrap;
+        }
+        .btn-remove-bl:hover { background:rgba(239,68,68,0.3); }
+
+        /* Alert feed items */
+        .alert-item {
+            background:rgba(255,255,255,0.03);
+            border:1px solid var(--border);
+            border-left:3px solid #818cf8;
+            border-radius:10px;
+            padding:0.75rem 1rem;
+            margin-bottom:0.6rem;
+            transition:border-color 0.2s;
+        }
+        .alert-item.critical { border-left-color:#ef4444; }
+        .alert-item.warning  { border-left-color:#f59e0b; }
+        .alert-item.resolved { opacity:0.45; }
+        .alert-item-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.3rem; }
+        .alert-severity {
+            padding:0.15rem 0.5rem;
+            border-radius:5px;
+            font-size:0.62rem;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:0.04em;
+        }
+        .alert-severity.critical { background:rgba(239,68,68,0.2); color:#f87171; }
+        .alert-severity.warning  { background:rgba(245,158,11,0.2); color:#fbbf24; }
+        .alert-plate {
+            font-family:'JetBrains Mono',monospace;
+            font-weight:700;
+            font-size:0.85rem;
+            color:#e2e8f0;
+        }
+        .alert-message { font-size:0.75rem; color:var(--text-secondary); line-height:1.4; margin-bottom:0.35rem; }
+        .alert-meta { display:flex; align-items:center; justify-content:space-between; }
+        .alert-ts { font-size:0.65rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+        .btn-resolve {
+            background:rgba(16,185,129,0.12);
+            color:#34d399;
+            border:1px solid rgba(16,185,129,0.2);
+            border-radius:6px;
+            padding:0.15rem 0.55rem;
+            font-size:0.65rem;
+            font-weight:600;
+            cursor:pointer;
+            transition:background 0.15s;
+        }
+        .btn-resolve:hover { background:rgba(16,185,129,0.25); }
+        .resolved-badge { font-size:0.65rem; color:#34d399; }
+        .no-alerts-msg { text-align:center; padding:2.5rem 1rem; color:var(--text-muted); }
+        .no-alerts-msg i { font-size:2rem; margin-bottom:0.5rem; opacity:0.3; }
+
+        /* Pulsing critical indicator */
+        @keyframes alertPulse {
+            0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0.4); }
+            50%      { box-shadow:0 0 0 6px rgba(239,68,68,0); }
+        }
+        .alert-item.critical:not(.resolved) { animation:alertPulse 2.5s ease-in-out infinite; }
+
+        /* Tab filter */
+        .alert-tabs { display:flex; gap:0.4rem; }
+        .alert-tab {
+            background:transparent;
+            color:var(--text-muted);
+            border:1px solid var(--border);
+            border-radius:7px;
+            padding:0.3rem 0.75rem;
+            font-size:0.73rem;
+            font-weight:600;
+            cursor:pointer;
+            transition:all 0.15s;
+        }
+        .alert-tab.active { background:rgba(99,102,241,0.2); border-color:rgba(99,102,241,0.4); color:#a5b4fc; }
+        .alert-tab:hover:not(.active) { border-color:rgba(99,102,241,0.2); color:var(--text-secondary); }
+    </style>
+</head>
+<body>
+<div class="app-container" style="height:100vh; overflow:hidden;">
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-icon"><i class="fa-solid fa-bell"></i></div>
+            <div>
+                <h1>Alert <span>Management System</span></h1>
+                <p class="subtitle">Real-Time Blacklisted Vehicle Detection • Anomaly Alerts • Blacklist Management</p>
+            </div>
+        </div>
+        <div class="topbar-actions">
+            <a href="/" class="nav-link"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+            <a href="/trajectory" class="nav-link"><i class="fa-solid fa-route"></i> Trajectory</a>
+            <a href="/analytics" class="nav-link"><i class="fa-solid fa-chart-area"></i> Analytics</a>
+            <a href="/alerts" class="nav-link active"><i class="fa-solid fa-bell"></i> Alerts <span class="alert-badge" id="navAlertBadge" style="display:none;">0</span></a>
+            <a href="/history" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
+        </div>
+    </header>
+
+    <div class="alerts-layout">
+        <!-- LEFT COLUMN: Summary + Blacklist Management -->
+        <div class="blacklist-col">
+            <!-- Alert Summary -->
+            <div class="alert-card">
+                <div class="alert-card-header">
+                    <h3><i class="fa-solid fa-shield-halved"></i> Alert Summary</h3>
+                    <span style="font-size:0.7rem;color:var(--text-muted);">Live</span>
+                </div>
+                <div class="alert-card-body">
+                    <div class="alert-summary-grid" id="alertSummaryGrid">
+                        <div class="summary-stat critical"><div class="val" id="summCritical">0</div><div class="lbl">Critical Alerts</div></div>
+                        <div class="summary-stat warning"><div class="val" id="summWarning">0</div><div class="lbl">Warnings</div></div>
+                        <div class="summary-stat active"><div class="val" id="summActive">0</div><div class="lbl">Active</div></div>
+                        <div class="summary-stat total"><div class="val" id="summTotal">0</div><div class="lbl">Total Fired</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add to Blacklist Form -->
+            <div class="alert-card">
+                <div class="alert-card-header">
+                    <h3><i class="fa-solid fa-ban"></i> Add to Blacklist</h3>
+                </div>
+                <div class="alert-card-body">
+                    <div class="form-group">
+                        <label class="form-label">License Plate Number</label>
+                        <input type="text" id="blPlateInput" class="form-input mono" placeholder="e.g. DL01AB1234" maxlength="15"/>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Reason / Flag Category</label>
+                        <input type="text" id="blReasonInput" class="form-input" placeholder="e.g. Stolen vehicle, FIR pending…" maxlength="200"/>
+                    </div>
+                    <button class="btn-add-bl" onclick="addToBlacklist()">
+                        <i class="fa-solid fa-plus"></i> Add to Blacklist
+                    </button>
+                    <div id="blFeedback" style="margin-top:0.6rem;font-size:0.75rem;display:none;"></div>
+                </div>
+            </div>
+
+            <!-- Blacklist Table -->
+            <div class="alert-card scrollable-card">
+                <div class="alert-card-header">
+                    <h3><i class="fa-solid fa-list-check"></i> Active Blacklist <span id="blCount" style="font-size:0.72rem;color:var(--text-muted);font-weight:400;margin-left:0.4rem;"></span></h3>
+                    <button class="btn-resolve" onclick="loadBlacklist()" style="font-size:0.7rem;padding:0.25rem 0.6rem;">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+                <div class="alert-card-body scrollable-body" style="padding:0.5rem;">
+                    <table class="bl-table">
+                        <thead><tr>
+                            <th>Plate</th>
+                            <th>Reason</th>
+                            <th>Flagged By</th>
+                            <th></th>
+                        </tr></thead>
+                        <tbody id="blacklistBody"><tr><td colspan="4" class="no-data-msg">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Alert Feed -->
+        <div class="alerts-col">
+            <!-- Active Alerts Feed -->
+            <div class="alert-card scrollable-card">
+                <div class="alert-card-header">
+                    <h3><i class="fa-solid fa-siren-on"></i> Live Alert Feed</h3>
+                    <div class="alert-tabs">
+                        <button class="alert-tab active" data-filter="active" onclick="setFilter('active',this)">Active</button>
+                        <button class="alert-tab" data-filter="all" onclick="setFilter('all',this)">All Alerts</button>
+                    </div>
+                </div>
+                <div class="alert-card-body scrollable-body" id="alertFeed">
+                    <div class="no-alerts-msg"><i class="fa-solid fa-shield-check"></i><br>No active alerts. System monitoring…</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+</body>
+</html>

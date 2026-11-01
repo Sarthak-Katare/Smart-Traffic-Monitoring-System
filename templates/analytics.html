@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Traffic Analytics | ANPR Intelligence Platform</title>
+    <meta name="description" content="City-wide traffic flow analytics, heatmaps, origin-destination patterns, and congestion detection.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Heatmap plugin -->
+    <script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .analytics-layout {
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 1.25rem;
+            overflow-y: auto;
+            height: calc(100vh - 80px);
+        }
+        .analytics-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .analytics-card.full-width { grid-column: 1 / -1; }
+        .analytics-card.map-card { grid-column: 1 / -1; height: 420px; }
+        .analytics-card-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255,255,255,0.02);
+        }
+        .analytics-card-header h3 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .analytics-card-header h3 i { color: #818cf8; }
+        .analytics-card-body { padding: 1.25rem; }
+        #heatmapContainer { width:100%; height:360px; border-radius:12px; }
+
+        /* Stat cards row */
+        .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; grid-column: 1 / -1; }
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: border-color 0.2s;
+        }
+        .stat-card:hover { border-color: rgba(99,102,241,0.4); }
+        .stat-icon {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .stat-icon.purple { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .stat-icon.green  { background: rgba(16,185,129,0.15); color: #34d399; }
+        .stat-icon.amber  { background: rgba(245,158,11,0.15); color: #fbbf24; }
+        .stat-icon.red    { background: rgba(239,68,68,0.15);  color: #f87171; }
+        .stat-label { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.15rem; }
+        .stat-value { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
+        .stat-sub   { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem; }
+
+        /* OD Matrix */
+        .od-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+        .od-table th {
+            background: rgba(255,255,255,0.04);
+            padding: 0.5rem 0.75rem;
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        .od-table td {
+            padding: 0.5rem 0.75rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .od-table tr:hover td { background: rgba(255,255,255,0.03); }
+        .od-cell-high { color: #f59e0b; font-weight: 700; }
+        .od-cell-med  { color: #818cf8; font-weight: 600; }
+        .od-row-label { font-weight: 600; color: var(--text-secondary); text-align: left !important; }
+        .od-self { color: var(--text-muted); }
+
+        /* Speed cards */
+        .speed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .speed-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+        }
+        .speed-route { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.3rem; }
+        .speed-value { font-size: 1.6rem; font-weight: 800; }
+        .speed-value.slow   { color: #ef4444; }
+        .speed-value.moderate { color: #f59e0b; }
+        .speed-value.normal { color: #10b981; }
+        .speed-value.fast   { color: #3b82f6; }
+        .speed-meta { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+        /* Congestion */
+        .congestion-list { display: flex; flex-direction: column; gap: 0.6rem; }
+        .congestion-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.65rem 0.9rem;
+        }
+        .congestion-badge {
+            padding: 0.2rem 0.55rem;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+        .congestion-badge.high { background: rgba(239,68,68,0.2); color: #f87171; }
+        .congestion-badge.moderate { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .congestion-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); flex: 1; }
+        .congestion-count { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700; color: #818cf8; }
+
+        .no-data-msg { text-align:center; padding:2rem; color:var(--text-muted); font-size:0.8rem; }
+        .chart-container { position: relative; height: 220px; }
+        .refresh-btn {
+            background: rgba(99,102,241,0.15);
+            color: #a5b4fc;
+            border: 1px solid rgba(99,102,241,0.25);
+            border-radius: 7px;
+            padding: 0.3rem 0.7rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .refresh-btn:hover { background: rgba(99,102,241,0.25); }
+    </style>
+</head>
+<body>
+<div class="app-container" style="overflow:hidden;">
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-icon"><i class="fa-solid fa-chart-area"></i></div>
+            <div>
+                <h1>City Traffic <span>Analytics Dashboard</span></h1>
+                <p class="subtitle">Macro-Level Traffic Flow Intelligence • Heatmaps • O-D Matrix • Speed Estimation</p>
+            </div>
+        </div>
+        <div class="topbar-actions">
+            <a href="/" class="nav-link"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+            <a href="/trajectory" class="nav-link"><i class="fa-solid fa-route"></i> Trajectory</a>
+            <a href="/analytics" class="nav-link active"><i class="fa-solid fa-chart-area"></i> Analytics</a>
+            <a href="/alerts" class="nav-link"><i class="fa-solid fa-bell"></i> Alerts <span class="alert-badge" id="navAlertBadge" style="display:none;">0</span></a>
+            <a href="/history" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
+        </div>
+    </header>
+
+    <div class="analytics-layout">
+
+        <!-- KPI Stat Cards Row -->
+        <div class="stat-row" id="statRow">
+            <div class="stat-card">
+                <div class="stat-icon purple"><i class="fa-solid fa-car-side"></i></div>
+                <div>
+                    <div class="stat-label">Total Vehicles (24h)</div>
+                    <div class="stat-value" id="statTotal">—</div>
+                    <div class="stat-sub">Plate events logged</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green"><i class="fa-solid fa-clock"></i></div>
+                <div>
+                    <div class="stat-label">Peak Hour</div>
+                    <div class="stat-value" id="statPeak">—</div>
+                    <div class="stat-sub" id="statPeakCount">Busiest time slot</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon amber"><i class="fa-solid fa-gauge"></i></div>
+                <div>
+                    <div class="stat-label">Avg. Speed (Cross-Cam)</div>
+                    <div class="stat-value" id="statSpeed">—</div>
+                    <div class="stat-sub">km/h city average</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div>
+                    <div class="stat-label">Congestion Nodes</div>
+                    <div class="stat-value" id="statCongestion">—</div>
+                    <div class="stat-sub">Active hotspots</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatmap Card -->
+        <div class="analytics-card map-card">
+            <div class="analytics-card-header">
+                <h3><i class="fa-solid fa-fire-flame-curved"></i> Live Traffic Density Heatmap</h3>
+                <button class="refresh-btn" onclick="refreshAnalytics()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+            </div>
+            <div style="padding:0.75rem;">
+                <div id="heatmapContainer"></div>
+            </div>
+        </div>
+
+        <!-- Hourly Flow Chart -->
+        <div class="analytics-card">
+            <div class="analytics-card-header">
+                <h3><i class="fa-solid fa-chart-line"></i> 24-Hour Vehicle Flow Trend</h3>
+            </div>
+            <div class="analytics-card-body">
+                <div class="chart-container">
+                    <canvas id="flowChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- OD Matrix -->
+        <div class="analytics-card">
+            <div class="analytics-card-header">
+                <h3><i class="fa-solid fa-arrows-left-right"></i> Origin–Destination Matrix</h3>
+            </div>
+            <div class="analytics-card-body" style="padding:0.5rem 0.75rem;">
+                <div id="odMatrix"><div class="no-data-msg">Loading…</div></div>
+            </div>
+        </div>
+
+        <!-- Speed Estimates -->
+        <div class="analytics-card">
+            <div class="analytics-card-header">
+                <h3><i class="fa-solid fa-gauge-high"></i> Inter-Camera Speed Estimates</h3>
+            </div>
+            <div class="analytics-card-body">
+                <div class="speed-grid" id="speedGrid">
+                    <div class="no-data-msg" style="grid-column:1/-1">No speed data yet. More plate sightings needed.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Congestion Hotspots -->
+        <div class="analytics-card">
+            <div class="analytics-card-header">
+                <h3><i class="fa-solid fa-traffic-light"></i> Congestion Hotspots (Last 1h)</h3>
+            </div>
+            <div class="analytics-card-body">
+                <div class="congestion-list" id="congestionList">
+                    <div class="no-data-msg">No congestion detected currently.</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Pytest
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large model files (optional - uncomment to exclude)
+# *.pt
+# *.weights
+
+# Video files (usually too large for GitHub)
+videos/*.mp4
+videos/*.avi
+videos/*.mov
+videos/*.mkv
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env

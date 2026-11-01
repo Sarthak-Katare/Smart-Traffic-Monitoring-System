@@ -1,0 +1,8 @@
+# ── All Phases ────────────────────────────────────────────────────────────────
+flask>=3.0.0          # Web server & routing
+opencv-python>=4.8.0  # Video capture and frame processing
+numpy>=1.24.0         # Array operations
+pillow>=10.0.0        # Image utilities
+ultralytics>=8.0.0    # YOLOv8 detection (auto-downloads yolov8n.pt ~6 MB on first run)
+                      # Note: also downloads PyTorch CPU ~250 MB on first install
+easyocr>=1.7.0        # ANPR OCR engine for license plate text recognition
